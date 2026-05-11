@@ -1,8 +1,6 @@
 # Immich date fixer
 ## Motivation
-During mass import, it sometimes happens that a big stack of images gets imported with invalid or missing time exif data.
-This leads to, in my case, entire years worth of images being assigned to the same day, which is whenever I imported them.
-In my case, I had the whole of 2023 happening on April 15, 2025. At least if you asked my Immich instance.
+It turns out that a surprising number of perfectly ordinary things, uploading photos to a file server, downloading them again, sending them over Discord, breathing near them wrong, will happily strip or overwrite the creation date metadata. The images arrive in Immich with a timestamp of "right now" instead of when the photo was actually taken, which means your entire 2023 summer holiday ends up on whatever Tuesday you decided to sort your files.
 This is particularly frustrating since this clutters the timeline AND the correct information is CLEARLY still at hand!
 Look at the original filenames!
 ```
