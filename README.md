@@ -86,7 +86,10 @@ python fix.py \
 
 #### Also fixing the time-of-day (`--fix-time`)
 
-If your filenames include a time component (e.g. `20260605_123049.jpg`) and you want the time corrected too — not just the date — pass `--fix-time`:
+If a file is set to the correct day according to their filename, it is being judged 'correctly set' completely ignoring time-of-day.
+If a correction is made, it is obviously set to the correct date including the correct time of day, but only if the actual day differs.
+If you also want to make corrections if the stored datetime differs by even a second, pass `--fix-time` to check for date + time when comparing immich datetime vs filename datetime.
+`--fix-time` has no effect on date-only filenames (those without an `HHMMSS` component); those always fall back to `12:00:00`.
 
 ```bash
 python fix.py \
@@ -97,9 +100,6 @@ python fix.py \
   --apply
 ```
 
-Whenever a date correction is applied (with or without `--fix-time`), the full datetime from the filename — including hours, minutes, and seconds — is written to Immich. `--fix-time` only affects the **"already correct" check**: without it, an asset whose date is already right is left untouched even if its time is wrong; with it, the time is compared too and corrected if it differs.
-
-`--fix-time` has no effect on date-only filenames (those without an `HHMMSS` component); those always fall back to `12:00:00`.
 
 ### Output
 
