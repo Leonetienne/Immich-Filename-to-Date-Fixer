@@ -10,6 +10,7 @@ import requests
 
 
 def parse_filename_dt(filename: str, tz: timezone):
+    """Returns (datetime, has_time) or (None, False)."""
     name = Path(filename).name
 
     full_match = re.search(
@@ -26,9 +27,9 @@ def parse_filename_dt(filename: str, tz: timezone):
         second = int(full_match.group(6))
 
         try:
-            return datetime(year, month, day, hour, minute, second, tzinfo=tz)
+            return datetime(year, month, day, hour, minute, second, tzinfo=tz), True
         except ValueError:
-            return None
+            return None, False
 
     date_only_match = re.search(
         r"(\d{4})(\d{2})(\d{2})",
@@ -41,11 +42,11 @@ def parse_filename_dt(filename: str, tz: timezone):
         day = int(date_only_match.group(3))
 
         try:
-            return datetime(year, month, day, 12, 0, 0, tzinfo=tz)
+            return datetime(year, month, day, 12, 0, 0, tzinfo=tz), False
         except ValueError:
-            return None
+            return None, False
 
-    return None
+    return None, False
 
 
 def immich_post(base_url, api_key, path, payload):
@@ -154,6 +155,8 @@ def main():
     parser.add_argument("--bad-date-from", help="Start of bad Immich timeline range, YYYY-MM-DD")
     parser.add_argument("--bad-date-to", help="End of bad Immich timeline range, YYYY-MM-DD, inclusive")
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--fix-time", action="store_true",
+                        help="Also correct the time-of-day (up to the second) when the filename contains HH MM SS")
     parser.add_argument("--tz-offset", default="+00:00")
     parser.add_argument("--csv", default=None)
 
@@ -178,7 +181,7 @@ def main():
         scanned += 1
 
         filename = get_asset_filename(asset)
-        new_dt = parse_filename_dt(filename, tz)
+        new_dt, has_time = parse_filename_dt(filename, tz)
 
         if not new_dt:
             skipped += 1
@@ -202,10 +205,22 @@ def main():
         old_iso = old_dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
         new_iso = new_dt_utc.isoformat().replace("+00:00", "Z")
 
-        if old_dt.date() == new_dt_utc.date():
+        fix_time_for_this = args.fix_time and has_time
+
+        if fix_time_for_this:
+            already_correct_flag = (
+                old_dt.astimezone(timezone.utc).replace(microsecond=0)
+                == new_dt_utc.replace(microsecond=0)
+            )
+            already_correct_label = "ALREADY_CORRECT_DATETIME"
+        else:
+            already_correct_flag = old_dt.date() == new_dt_utc.date()
+            already_correct_label = "ALREADY_CORRECT_DAY"
+
+        if already_correct_flag:
             already_correct += 1
-            print(f"File {filename} was already on correct date {old_iso}")
-            rows.append([asset.get("id"), filename, "ALREADY_CORRECT_DAY", old_iso, new_iso])
+            print(f"File {filename} was already on correct {'datetime' if fix_time_for_this else 'date'} {old_iso}")
+            rows.append([asset.get("id"), filename, already_correct_label, old_iso, new_iso])
             continue
 
         print(f"File {filename} was corrected from {old_iso} to {new_iso}")

@@ -86,6 +86,23 @@ python fix.py \
   --apply
 ```
 
+#### Also fixing the time-of-day (`--fix-time`)
+
+If your filenames include a time component (e.g. `20260605_123049.jpg`) and you want the time corrected too — not just the date — pass `--fix-time`:
+
+```bash
+python fix.py \
+  --url "https://your-immich.example.com" \
+  --bad-date "2025-04-15" \
+  --tz-offset "+02:00" \
+  --fix-time \
+  --apply
+```
+
+Without `--fix-time`, an asset whose date is already correct will be left untouched even if its time is wrong. With `--fix-time`, the full datetime (to the second) is compared and corrected when it differs.
+
+`--fix-time` has no effect on date-only filenames (those without an `HHMMSS` component); those always fall back to `12:00:00`.
+
 ### Output
 
 The script prints lines like:
@@ -98,7 +115,7 @@ Or:
 File IMG_20230312_130300_383.jpg was already on correct date 2023-03-12T12:03:00Z
 ```
 
-Date comparison is day-only. Time of day is ignored when deciding whether a file is already correct.
+By default, comparison is day-only — time of day is ignored when deciding whether a file is already correct. Use `--fix-time` to also correct the time-of-day when the filename contains it (see below).
 
 ### CSV report
 This script generates a csv reporting what was done.
@@ -136,12 +153,14 @@ Examples:
 ```text
 IMG_20230312_130300_383.jpg
 IMG-20230312-130300.jpg
+20260605_123049.jpg
 ```
 
-Both are parsed as:
+All parsed as their respective datetime, e.g.:
 
 ```text
 2023-03-12 13:03:00
+2026-06-05 12:30:49
 ```
 
 If no time is found, the script looks for a date in this form:
