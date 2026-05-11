@@ -99,7 +99,7 @@ python fix.py \
   --apply
 ```
 
-Without `--fix-time`, an asset whose date is already correct will be left untouched even if its time is wrong. With `--fix-time`, the full datetime (to the second) is compared and corrected when it differs.
+Whenever a date correction is applied (with or without `--fix-time`), the full datetime from the filename — including hours, minutes, and seconds — is written to Immich. `--fix-time` only affects the **"already correct" check**: without it, an asset whose date is already right is left untouched even if its time is wrong; with it, the time is compared too and corrected if it differs.
 
 `--fix-time` has no effect on date-only filenames (those without an `HHMMSS` component); those always fall back to `12:00:00`.
 
