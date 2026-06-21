@@ -183,6 +183,18 @@ All parsed as their respective datetime, e.g.:
 2026-06-05 12:30:49
 ```
 
+It also recognizes WhatsApp's "Save Image" filename, which uses a different separator style:
+
+```text
+WhatsApp Image 2026-06-22 at 14.37.05.jpeg
+```
+
+Parsed as:
+
+```text
+2026-06-22 14:37:05
+```
+
 If no time is found, the script looks for a date in this form:
 
 ```text
@@ -212,4 +224,11 @@ PXL_20232312.jpg
 is skipped because `23` is not a valid month.
 
 The script uses the first valid date pattern it finds in the filename.
+
+Filename parsing lives in its own module, [`filename_parsing.py`](filename_parsing.py), as a set of small `DateExtractor` classes. To support another filename format, add a class with a `matches()` and `extract()` method — it gets picked up automatically, no registration needed. See [`test_filename_parsing.py`](test_filename_parsing.py) for examples, and run the tests with:
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest
+```
 

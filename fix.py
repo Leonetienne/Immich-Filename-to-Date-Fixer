@@ -2,51 +2,12 @@
 import argparse
 import csv
 import os
-import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
 
-
-def parse_filename_dt(filename: str, tz: timezone):
-    """Returns (datetime, has_time) or (None, False)."""
-    name = Path(filename).name
-
-    full_match = re.search(
-        r"(\d{4})(\d{2})(\d{2})[_-](\d{2})(\d{2})(\d{2})",
-        name,
-    )
-
-    if full_match:
-        year = int(full_match.group(1))
-        month = int(full_match.group(2))
-        day = int(full_match.group(3))
-        hour = int(full_match.group(4))
-        minute = int(full_match.group(5))
-        second = int(full_match.group(6))
-
-        try:
-            return datetime(year, month, day, hour, minute, second, tzinfo=tz), True
-        except ValueError:
-            return None, False
-
-    date_only_match = re.search(
-        r"(\d{4})(\d{2})(\d{2})",
-        name,
-    )
-
-    if date_only_match:
-        year = int(date_only_match.group(1))
-        month = int(date_only_match.group(2))
-        day = int(date_only_match.group(3))
-
-        try:
-            return datetime(year, month, day, 12, 0, 0, tzinfo=tz), False
-        except ValueError:
-            return None, False
-
-    return None, False
+from filename_parsing import parse_filename_dt
 
 
 def api_key_headers(api_key):
