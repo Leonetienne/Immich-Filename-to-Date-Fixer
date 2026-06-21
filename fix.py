@@ -49,29 +49,40 @@ def parse_filename_dt(filename: str, tz: timezone):
     return None, False
 
 
-def immich_post(base_url, api_key, path, payload):
-    r = requests.post(
+def api_key_headers(api_key):
+    return {"x-api-key": api_key, "Content-Type": "application/json"}
+
+
+def _immich_request(method, base_url, headers, path, payload):
+    r = requests.request(
+        method,
         f"{base_url.rstrip('/')}/api{path}",
-        headers={"x-api-key": api_key, "Content-Type": "application/json"},
+        headers=headers,
         json=payload,
         timeout=60,
     )
-    r.raise_for_status()
-    return r.json()
+
+    if not r.ok:
+        try:
+            detail = r.json().get("message", r.text)
+        except ValueError:
+            detail = r.text
+        if isinstance(detail, list):
+            detail = "; ".join(detail)
+        raise SystemExit(f"Immich API error {r.status_code} on {method} {path}: {detail}")
+
+    return r.json() if r.content else None
 
 
-def immich_put(base_url, api_key, path, payload):
-    r = requests.put(
-        f"{base_url.rstrip('/')}/api{path}",
-        headers={"x-api-key": api_key, "Content-Type": "application/json"},
-        json=payload,
-        timeout=60,
-    )
-    r.raise_for_status()
-    return r.json()
+def immich_post(base_url, headers, path, payload):
+    return _immich_request("POST", base_url, headers, path, payload)
 
 
-def search_assets_in_bad_date_range(base_url, api_key, bad_date_from, bad_date_to, page_size=500):
+def immich_put(base_url, headers, path, payload):
+    return _immich_request("PUT", base_url, headers, path, payload)
+
+
+def search_assets_in_bad_date_range(base_url, headers, bad_date_from, bad_date_to, page_size=500, visibility=None):
     start = datetime.fromisoformat(bad_date_from).replace(tzinfo=timezone.utc)
 
     # Inclusive date range: --bad-date-to 2025-04-30 includes all of April 30.
@@ -89,7 +100,10 @@ def search_assets_in_bad_date_range(base_url, api_key, bad_date_from, bad_date_t
             "withExif": True,
         }
 
-        data = immich_post(base_url, api_key, "/search/metadata", payload)
+        if visibility:
+            payload["visibility"] = visibility
+
+        data = immich_post(base_url, headers, "/search/metadata", payload)
 
         assets = (
             data.get("assets", {}).get("items")
@@ -144,13 +158,8 @@ def resolve_bad_date_range(args):
     raise SystemExit("Use either --bad-date YYYY-MM-DD or --bad-date-from YYYY-MM-DD --bad-date-to YYYY-MM-DD.")
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Fix Immich asset dates for assets clustered on one wrong date/range by parsing the true date from filenames."
-    )
-
+def add_common_arguments(parser):
     parser.add_argument("--url", required=True)
-    parser.add_argument("--key", default=os.getenv("IMMICH_API_KEY"))
     parser.add_argument("--bad-date", help="Single bad Immich timeline date, YYYY-MM-DD")
     parser.add_argument("--bad-date-from", help="Start of bad Immich timeline range, YYYY-MM-DD")
     parser.add_argument("--bad-date-to", help="End of bad Immich timeline range, YYYY-MM-DD, inclusive")
@@ -159,17 +168,10 @@ def main():
                         help="Also correct the time-of-day (up to the second) when the filename contains HH MM SS")
     parser.add_argument("--tz-offset", default="+00:00")
     parser.add_argument("--csv", default=None)
+    return parser
 
-    args = parser.parse_args()
 
-    if not args.key:
-        raise SystemExit("Missing API key. Set IMMICH_API_KEY or pass --key.")
-
-    bad_date_from, bad_date_to = resolve_bad_date_range(args)
-
-    csv_filename = args.csv or f"immich-date-fix-{bad_date_from}_to_{bad_date_to}.csv"
-    tz = parse_tz_offset(args.tz_offset)
-
+def run(base_url, headers, bad_date_from, bad_date_to, tz, csv_filename, apply_changes, fix_time, visibility=None):
     rows = []
     scanned = 0
     matched = 0
@@ -177,7 +179,12 @@ def main():
     skipped = 0
     already_correct = 0
 
-    for asset in search_assets_in_bad_date_range(args.url, args.key, bad_date_from, bad_date_to):
+    # Snapshot the full result set before applying any fixes: correcting an asset's date moves it
+    # outside takenAfter/takenBefore, which would shift page offsets and skip assets mid-scan
+    # if we paginated and applied changes at the same time.
+    assets = list(search_assets_in_bad_date_range(base_url, headers, bad_date_from, bad_date_to, visibility=visibility))
+
+    for asset in assets:
         scanned += 1
 
         filename = get_asset_filename(asset)
@@ -205,7 +212,7 @@ def main():
         old_iso = old_dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
         new_iso = new_dt_utc.isoformat().replace("+00:00", "Z")
 
-        fix_time_for_this = args.fix_time and has_time
+        fix_time_for_this = fix_time and has_time
 
         if fix_time_for_this:
             already_correct_flag = (
@@ -228,15 +235,15 @@ def main():
         rows.append([
             asset.get("id"),
             filename,
-            "WOULD_CORRECT" if not args.apply else "CORRECTED",
+            "WOULD_CORRECT" if not apply_changes else "CORRECTED",
             old_iso,
             new_iso,
         ])
 
-        if args.apply:
+        if apply_changes:
             immich_put(
-                args.url,
-                args.key,
+                base_url,
+                headers,
                 f"/assets/{asset['id']}",
                 {"dateTimeOriginal": new_iso},
             )
@@ -256,8 +263,37 @@ def main():
     print(f"Skipped: {skipped}")
     print(f"Report: {csv_filename}")
 
-    if not args.apply:
+    if not apply_changes:
         print("Dry-run only. Re-run with --apply to update Immich.")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Fix Immich asset dates for assets clustered on one wrong date/range by parsing the true date from filenames."
+    )
+    add_common_arguments(parser)
+    parser.add_argument("--key", default=os.getenv("IMMICH_API_KEY"))
+
+    args = parser.parse_args()
+
+    if not args.key:
+        raise SystemExit("Missing API key. Set IMMICH_API_KEY or pass --key.")
+
+    bad_date_from, bad_date_to = resolve_bad_date_range(args)
+
+    csv_filename = args.csv or f"immich-date-fix-{bad_date_from}_to_{bad_date_to}.csv"
+    tz = parse_tz_offset(args.tz_offset)
+
+    run(
+        args.url,
+        api_key_headers(args.key),
+        bad_date_from,
+        bad_date_to,
+        tz,
+        csv_filename,
+        args.apply,
+        args.fix_time,
+    )
 
 
 if __name__ == "__main__":

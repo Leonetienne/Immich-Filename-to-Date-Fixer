@@ -101,6 +101,28 @@ python fix.py \
 ```
 
 
+### Fixing assets in the Locked Folder (`fix-locked-folder.py`)
+
+Immich's Locked Folder hides assets behind a PIN, and the regular Immich API key is **not enough** to read or update them. Immich's server only grants access to locked assets to a real logged-in session that has been unlocked with the PIN.
+
+For this reason, locked-folder support lives in its own script, `fix-locked-folder.py`, instead of `fix.py`. It reuses all the filename-date-parsing and reporting logic from `fix.py`, but logs in with your Immich account email/password and unlocks the session with your PIN instead of using an API key.
+
+It supports the same `--bad-date`/`--bad-date-from`/`--bad-date-to`, `--apply`, `--fix-time`, `--tz-offset`, and `--csv` flags as `fix.py` (see above), plus:
+
+```bash
+python fix-locked-folder.py \
+  --url "https://your-immich.example.com" \
+  --bad-date "2025-04-15" \
+  --tz-offset "+02:00" \
+  --login-email "you@example.com" \
+  --login-pass "your-account-password" \
+  --locked-pin "123456"
+```
+
+If `--login-email`, `--login-pass`, or `--locked-pin` are omitted, you'll be prompted for them interactively (password and PIN input are hidden). They can also be set via the `IMMICH_LOGIN_EMAIL`, `IMMICH_LOGIN_PASS`, and `IMMICH_LOCKED_PIN` environment variables.
+
+This script only ever touches assets with the `locked` visibility — your regular timeline is left untouched. As with `fix.py`, it runs in dry-run mode unless you pass `--apply`. The session's elevated (unlocked) access is dropped again once the script finishes.
+
 ### Output
 
 The script prints lines like:
