@@ -1,6 +1,6 @@
 # Immich date fixer
 ## Motivation
-It turns out that a surprising number of perfectly ordinary things, uploading photos to a file server, downloading them again, sending them over Discord, breathing near them wrong, will happily strip or overwrite the creation date metadata. The images arrive in Immich with a timestamp of "right now" instead of when the photo was actually taken, which means your entire 2023 summer holiday ends up on whatever Tuesday you decided to sort your files.
+It turns out that a surprising number of perfectly ordinary things, uploading photos and videos to a file server, downloading them again, sending them over Discord, breathing near them wrong, will happily strip or overwrite the creation date metadata. The media arrives in Immich with a timestamp of "right now" instead of when it was actually taken, which means your entire 2023 summer holiday ends up on whatever Tuesday you decided to sort your files.
 This is particularly frustrating since this clutters the timeline AND the correct information is CLEARLY still at hand!
 Look at the original filenames!
 ```
@@ -174,6 +174,7 @@ Examples:
 IMG_20230312_130300_383.jpg
 IMG-20230312-130300.jpg
 20260605_123049.jpg
+VID_20230312_130300.mp4
 ```
 
 All parsed as their respective datetime, e.g.:
@@ -181,6 +182,7 @@ All parsed as their respective datetime, e.g.:
 ```text
 2023-03-12 13:03:00
 2026-06-05 12:30:49
+2023-03-12 13:03:00
 ```
 
 It also recognizes WhatsApp's "Save Image" filename, which uses a different separator style:

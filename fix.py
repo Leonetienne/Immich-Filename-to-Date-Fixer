@@ -43,46 +43,52 @@ def immich_put(base_url, headers, path, payload):
     return _immich_request("PUT", base_url, headers, path, payload)
 
 
+ASSET_TYPES = ("IMAGE", "VIDEO")
+
+
 def search_assets_in_bad_date_range(base_url, headers, bad_date_from, bad_date_to, page_size=500, visibility=None):
     start = datetime.fromisoformat(bad_date_from).replace(tzinfo=timezone.utc)
 
     # Inclusive date range: --bad-date-to 2025-04-30 includes all of April 30.
     end = datetime.fromisoformat(bad_date_to).replace(tzinfo=timezone.utc) + timedelta(days=1)
 
-    page = 1
+    # /search/metadata only accepts a single asset type per request, so each type gets its own
+    # paginated pass.
+    for asset_type in ASSET_TYPES:
+        page = 1
 
-    while True:
-        payload = {
-            "takenAfter": start.isoformat().replace("+00:00", "Z"),
-            "takenBefore": end.isoformat().replace("+00:00", "Z"),
-            "type": "IMAGE",
-            "size": page_size,
-            "page": page,
-            "withExif": True,
-        }
+        while True:
+            payload = {
+                "takenAfter": start.isoformat().replace("+00:00", "Z"),
+                "takenBefore": end.isoformat().replace("+00:00", "Z"),
+                "type": asset_type,
+                "size": page_size,
+                "page": page,
+                "withExif": True,
+            }
 
-        if visibility:
-            payload["visibility"] = visibility
+            if visibility:
+                payload["visibility"] = visibility
 
-        data = immich_post(base_url, headers, "/search/metadata", payload)
+            data = immich_post(base_url, headers, "/search/metadata", payload)
 
-        assets = (
-            data.get("assets", {}).get("items")
-            or data.get("items")
-            or data.get("results")
-            or []
-        )
+            assets = (
+                data.get("assets", {}).get("items")
+                or data.get("items")
+                or data.get("results")
+                or []
+            )
 
-        if not assets:
-            break
+            if not assets:
+                break
 
-        for asset in assets:
-            yield asset
+            for asset in assets:
+                yield asset
 
-        if len(assets) < page_size:
-            break
+            if len(assets) < page_size:
+                break
 
-        page += 1
+            page += 1
 
 
 def get_asset_filename(asset):

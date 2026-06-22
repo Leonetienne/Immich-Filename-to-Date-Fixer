@@ -17,6 +17,18 @@ def test_hyphen_datetime():
     assert has_time is True
 
 
+def test_video_underscore_datetime():
+    dt, has_time = parse_filename_dt("VID_20230312_130300.mp4", UTC)
+    assert dt == datetime(2023, 3, 12, 13, 3, 0, tzinfo=UTC)
+    assert has_time is True
+
+
+def test_video_date_only_fallback():
+    dt, has_time = parse_filename_dt("VID-20230312-WA0001.mp4", UTC)
+    assert dt == datetime(2023, 3, 12, 12, 0, 0, tzinfo=UTC)
+    assert has_time is False
+
+
 def test_bare_datetime():
     dt, has_time = parse_filename_dt("20260605_123049.jpg", UTC)
     assert dt == datetime(2026, 6, 5, 12, 30, 49, tzinfo=UTC)
